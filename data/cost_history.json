@@ -1,0 +1,68 @@
+[
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-08-31",
+    "cost": 0.001
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Elastic Compute Cloud - Compute",
+    "date": "2026-08-31",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-01",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Elastic Compute Cloud - Compute",
+    "date": "2026-09-01",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-02",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-03",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Simple Storage Service",
+    "date": "2026-09-03",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-05",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-06",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-07",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Simple Storage Service",
+    "date": "2026-09-10",
+    "cost": 0.0
+  }
+]
