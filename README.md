@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Cloud Cost Sentinel
 
 A lightweight, cloud-agnostic agent that watches cloud spend, detects
@@ -63,3 +64,7 @@ Requires an AWS IAM user/role with `ce:GetCostAndUsage` permission (read-only).
 - **Rule-based detection, not ML** — a threshold/rolling-average approach
   is transparent, explainable in an interview, and doesn't need training
   data the project doesn't have yet.
+=======
+# cloud-cost-sentinel
+Designed and built a multi-cloud cost-anomaly monitoring agent (Python, AWS Cost Explorer API) with a pluggable adapter architecture for GCP/Azure - 100% free-tier.
+>>>>>>> 00729abe54a9189d3ba8ad0e8605000c4977398a
