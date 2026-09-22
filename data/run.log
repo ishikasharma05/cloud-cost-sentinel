@@ -1,0 +1,6 @@
+[2026-09-17T09:00:04.953456] Fetching AWS cost data...
+Stored 11 total records (6 fetched this run).
+Data written to: /mnt/c/Users/ishik/OneDrive/Documents/GitHub/cloud-cost-sentinel/data/cost_history.json
+[2026-09-18T10:36:33.292265] Fetching AWS cost data...
+Stored 13 total records (6 fetched this run).
+Data written to: /mnt/c/Users/ishik/OneDrive/Documents/GitHub/cloud-cost-sentinel/data/cost_history.json
