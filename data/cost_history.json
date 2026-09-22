@@ -64,5 +64,71 @@
     "service": "Amazon Simple Storage Service",
     "date": "2026-09-10",
     "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-16",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-17",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon EC2 Container Registry (ECR)",
+    "date": "2026-09-18",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "EC2 - Other",
+    "date": "2026-09-18",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Elastic Compute Cloud - Compute",
+    "date": "2026-09-18",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Elastic Load Balancing",
+    "date": "2026-09-18",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Simple Storage Service",
+    "date": "2026-09-18",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon EC2 Container Registry (ECR)",
+    "date": "2026-09-19",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon Simple Storage Service",
+    "date": "2026-09-19",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon EC2 Container Registry (ECR)",
+    "date": "2026-09-20",
+    "cost": 0.0
+  },
+  {
+    "provider": "aws",
+    "service": "Amazon EC2 Container Registry (ECR)",
+    "date": "2026-09-21",
+    "cost": 0.0
   }
 ]

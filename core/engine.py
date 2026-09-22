@@ -1,17 +1,13 @@
 """
 engine.py
 
-Fetches cost data from every connected cloud provider adapter and stores
-it locally as JSON, in one normalized format regardless of provider.
+Week 1 scope: fetch AWS cost data and store it locally as JSON.
 Detection and alerting get wired in during Week 2 and Week 3 --
 see detector.py and alerter.py for the (currently stubbed) next steps.
 
-Run this manually once a day to build up real baseline data:
-    python3 core/engine.py
-
-If a provider's adapter fails (e.g. GCP billing export still
-initializing), the run continues with whichever providers succeeded
-rather than failing the whole run.
+Run this manually once a day for the first week to build up real
+baseline data:
+    python core/engine.py
 """
 
 import json
@@ -44,7 +40,6 @@ def save_history(records: list[dict]) -> None:
 
 
 def dedupe(records: list[dict]) -> list[dict]:
-    """Keep only one record per (provider, service, date) combo."""
     seen = {}
     for r in records:
         key = (r["provider"], r["service"], r["date"])
@@ -53,35 +48,15 @@ def dedupe(records: list[dict]) -> list[dict]:
 
 
 def run() -> None:
-    print(f"[{datetime.now().isoformat()}] Fetching cost data...")
+    print(f"[{datetime.now().isoformat()}] Fetching AWS cost data...")
 
-    new_records = []
-
-    try:
-        aws_records = get_aws_costs(days=14)
-        print(f"  AWS: fetched {len(aws_records)} records.")
-        new_records.extend(aws_records)
-    except Exception as e:
-        print(f"  AWS: fetch failed ({e})")
-
-    try:
-        gcp_records = get_gcp_costs(days=14)
-        print(f"  GCP: fetched {len(gcp_records)} records.")
-        new_records.extend(gcp_records)
-    except Exception as e:
-        print(f"  GCP: fetch failed ({e})")
-
+    new_records = get_daily_costs(days=14)
     existing = load_history()
     combined = dedupe(existing + new_records)
     save_history(combined)
 
     print(f"Stored {len(combined)} total records ({len(new_records)} fetched this run).")
     print(f"Data written to: {DATA_FILE}")
-
-    # Week 2 will plug in here:
-    # anomalies = detector.find_anomalies(combined)
-    # if anomalies:
-    #     alerter.send_alert(anomalies)
 
 
 if __name__ == "__main__":
