@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from adapters.aws_adapter import get_daily_costs as get_aws_costs
 from adapters.gcp_adapter import get_daily_costs as get_gcp_costs
+from adapters.azure_adapter import get_daily_costs as get_azure_costs
 
 DATA_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -59,6 +60,13 @@ def run() -> None:
         new_records.extend(gcp_records)
     except Exception as e:
         print(f"  GCP: fetch failed ({e})")
+
+    try:
+        azure_records = get_azure_costs(days=14)
+        print(f"  Azure: fetched {len(azure_records)} records.")
+        new_records.extend(azure_records)
+    except Exception as e:
+        print(f"  Azure: fetch failed ({e})")
 
     existing = load_history()
     combined = dedupe(existing + new_records)
