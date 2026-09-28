@@ -3,6 +3,9 @@ engine.py
 
 Fetches cost data from every connected cloud provider adapter and stores
 it locally as JSON, in one normalized format regardless of provider.
+
+If a provider's adapter fails (e.g. a billing export still initializing),
+the run continues with whichever providers succeeded.
 """
 
 import json
