@@ -1,0 +1,45 @@
+name: Daily cost check
+
+on:
+  schedule:
+    - cron: "30 4 * * *"   # 04:30 UTC = 10:00 IST, after yesterday's billing data lands
+  workflow_dispatch:        # lets you run it manually from the Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # cost_history.json and alerted.json are gitignored, so persist them
+      # between runs with the Actions cache (a fresh key each run, restored by prefix).
+      - name: Restore history + alert state
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cost_history.json
+            data/alerted.json
+          key: sentinel-data-${{ github.run_id }}
+          restore-keys: sentinel-data-
+
+      - name: Fetch, detect, alert
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m core.pipeline
+
+      - name: Save history + alert state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/cost_history.json
+            data/alerted.json
+          key: sentinel-data-${{ github.run_id }}

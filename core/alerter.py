@@ -17,11 +17,15 @@ from core.detector import Anomaly
 DEFAULT_STATE = Path(__file__).resolve().parent.parent / "data" / "alerted.json"
 
 
+SYMBOLS = {"USD": "$", "INR": "₹", "EUR": "€", "GBP": "£"}
+
+
 def format_message(a: Anomaly) -> str:
+    sym = SYMBOLS.get(a.currency, a.currency + " ")
     pct = "new spend" if a.pct_over_baseline == float("inf") else f"+{a.pct_over_baseline}%"
     return (
         f":rotating_light: Cost anomaly on *{a.provider.upper()} / {a.service}* ({a.date})\n"
-        f"Cost: ${a.cost:.2f} vs baseline ${a.baseline_mean:.2f} ({pct}, z={a.z_score})"
+        f"Cost: {sym}{a.cost:.2f} vs baseline {sym}{a.baseline_mean:.2f} ({pct}, z={a.z_score})"
     )
 
 
@@ -49,10 +53,11 @@ def _post(webhook_url: str, text: str) -> None:
 def send_alerts(
     anomalies: list[Anomaly],
     webhook_url: str | None = None,
-    state_path: Path = DEFAULT_STATE,
+    state_path: Path | None = None,
 ) -> list[Anomaly]:
     """Send each anomaly once (dedup by provider+service+date). Returns those sent."""
     webhook_url = webhook_url or os.environ.get("SLACK_WEBHOOK_URL")
+    state_path = state_path or DEFAULT_STATE
     already = _load_state(state_path)
     sent: list[Anomaly] = []
 

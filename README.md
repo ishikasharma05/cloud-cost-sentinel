@@ -6,14 +6,34 @@ built entirely on free-tier usage.
 
 ## Status
 
-🚧 Work in progress — building in public, week by week.
+All planned weeks are complete.
 
 - [x] Week 1 — AWS cost data ingestion (Cost Explorer) + local storage
-- [x] Week 1.5 — GCP cost data ingestion (BigQuery Billing Export), wired into the same normalized pipeline
-- [ ] Week 2 — Baseline + anomaly detection
-- [ ] Week 3 — Alerting (Slack/webhook)
-- [ ] Week 4 — Scheduling, docs, polish
-- [ ] Later — Azure adapter (pending free-tier account access)
+- [x] Week 1.5 — GCP cost data ingestion (BigQuery Billing Export)
+- [x] Week 2 — Baseline + anomaly detection (rolling baseline, three-gate rule)
+- [x] Week 3 — Alerting (Slack-compatible webhook, console fallback, no duplicate alerts)
+- [x] Week 4 — Scheduling (GitHub Actions daily cron), CI, docs
+- [x] Azure adapter (Cost Management API; currency-aware)
+
+Tests run on every push via GitHub Actions (`pytest`).
+
+## How it works
+
+```
+adapters (AWS / GCP / Azure)  ->  engine  ->  data/cost_history.json
+                                                     |
+                              detector (rolling baseline) -> alerter (Slack)
+```
+
+A service is flagged for a day only if it clears **all three** gates, which
+keeps tiny-dollar noise from paging anyone:
+
+1. **z-score** against the previous 7 days >= 3
+2. **absolute** increase >= $0.50
+3. **relative** increase >= 30%
+
+Each provider is judged on its own newest day, so a cloud whose billing data
+lags a day behind is not skipped. Today's partial data is dropped before storing.
 
 ## Why this project
 
@@ -62,8 +82,32 @@ export → BigQuery export), and the account used needs BigQuery Data Viewer
 ```bash
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python3 core/engine.py   # fetches and stores the last 14 days of cost data from every connected provider
+python3 -m core.pipeline          # fetch -> store -> detect -> alert, in one go
+python3 -m core.engine            # fetch and store only
+python3 -m core.monitor --simulate  # demo: inject a fake 4x spike and see the alert
+python3 -m pytest                 # run the tests
 ```
+
+**Alerts:** set `SLACK_WEBHOOK_URL` (Slack incoming webhook or any compatible
+endpoint). Without it, alerts print to the console.
+
+**Azure (optional):** `az login` and set `AZURE_SUBSCRIPTION_ID`. Azure bills in
+your account currency (e.g. INR); it is kept per record and shown in alerts.
+
+## Running it daily
+
+`.github/workflows/daily-check.yml` runs the pipeline every day at 10:00 IST
+(and on demand from the Actions tab). Add these repository secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | read-only IAM user (`ce:GetCostAndUsage` only) |
+| `SLACK_WEBHOOK_URL` | where alerts go |
+
+Providers without credentials simply fail that step and are logged; the run
+continues with the rest. History and alert state persist between runs via the
+Actions cache. GCP/Azure in CI would need their own credentials (e.g. workload
+identity federation), so they run locally for now.
 
 ## Design decisions
 

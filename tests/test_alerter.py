@@ -27,3 +27,7 @@ def test_new_date_is_a_new_alert(tmp_path):
     state = tmp_path / "state.json"
     send_alerts([an("2026-09-20")], state_path=state)
     assert len(send_alerts([an("2026-09-21")], state_path=state)) == 1
+
+def test_inr_symbol_used_for_non_usd():
+    a = Anomaly("azure", "Storage", "2026-09-20", 1600.0, 400.0, 5.0, 9.0, 300.0, "INR")
+    assert "₹1600.00" in format_message(a)

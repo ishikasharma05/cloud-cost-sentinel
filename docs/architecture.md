@@ -130,11 +130,28 @@ interviews and for actually trusting the alerts), needs no training data
 this project doesn't have, and is the same fundamental idea real cost
 anomaly tools (like AWS's own Cost Anomaly Detection) use under the hood.
 
-## What's next
+## Detection and alerting
 
-- Week 2: implement the actual baseline + detection rules against real
-  multi-day AWS + GCP data
-- Week 3: wire in Slack/webhook alerting
-- Week 4: scheduling (Lambda + EventBridge or Cloud Functions + Scheduler,
-  both free-tier), final polish
-- Later: Azure adapter, once free-tier account access is resolved
+`core/baseline.py` computes a mean and standard deviation per (provider,
+service) from the 7 days before the day being checked, with a std floor so a
+perfectly flat history does not explode the z-score. `core/detector.py` flags
+a day only if the z-score, absolute-dollar and percent gates all pass.
+`core/alerter.py` posts to a webhook (or prints), and records what it sent so
+the same anomaly is never alerted twice; a failed send is not recorded, so it
+is retried next run.
+
+## Pipeline and scheduling
+
+`core/pipeline.py` runs fetch -> store -> detect -> alert. It exits non-zero
+only if every provider failed, so CI shows a red run for a real outage but not
+for one cloud being temporarily unavailable. A GitHub Actions cron runs it
+daily; history and alert state are persisted with the Actions cache because
+the data files are gitignored.
+
+## Known limitations
+
+- Rule-based detection suits sudden spikes; slow creep over weeks can hide in
+  a rolling baseline. A longer second window would address that.
+- GCP and Azure are not wired into the scheduled run yet (credentials).
+- Costs are not converted between currencies; each provider is compared with
+  its own history.

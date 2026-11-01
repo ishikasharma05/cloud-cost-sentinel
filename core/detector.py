@@ -24,6 +24,7 @@ class Anomaly:
     baseline_std: float
     z_score: float
     pct_over_baseline: float
+    currency: str = "USD"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -38,30 +39,36 @@ def detect_anomalies(
     min_abs_increase: float = 0.50,
     min_pct_increase: float = 0.30,
 ) -> list[Anomaly]:
-    """Return anomalies for target_date (defaults to the newest date in the data)."""
+    """Return anomalies for target_date (default: each provider's newest date)."""
     if not records:
         return []
-    if target_date is None:
-        target_date = max(r["date"] for r in records)
+    # Default: judge each provider on ITS newest day, so a cloud whose billing
+    # data lags a day behind the others is still checked instead of skipped.
+    latest = {}
+    for r in records:
+        latest[r["provider"]] = max(latest.get(r["provider"], ""), r["date"])
 
+    currency_of = {(r["provider"], r["service"]): r.get("currency", "USD") for r in records}
     found: list[Anomaly] = []
     for (provider, service), by_date in group_series(records).items():
-        if target_date not in by_date:
+        target = target_date or latest[provider]
+        if target not in by_date:
             continue
-        base = compute_baseline(by_date, target_date, baseline_days, min_history)
+        base = compute_baseline(by_date, target, baseline_days, min_history)
         if base is None:
             continue
 
-        cost = by_date[target_date]
+        cost = by_date[target]
         increase = cost - base.mean
         z = increase / base.std
         pct = increase / base.mean if base.mean > 0 else float("inf")
 
         if z >= z_threshold and increase >= min_abs_increase and pct >= min_pct_increase:
             found.append(Anomaly(
-                provider=provider, service=service, date=target_date,
+                provider=provider, service=service, date=target,
                 cost=round(cost, 4), baseline_mean=round(base.mean, 4),
                 baseline_std=round(base.std, 4), z_score=round(z, 2),
                 pct_over_baseline=round(pct * 100, 1) if pct != float("inf") else float("inf"),
+                currency=currency_of.get((provider, service), "USD"),
             ))
     return sorted(found, key=lambda a: a.z_score, reverse=True)

@@ -1,83 +1,109 @@
+"""Fetch cost data from every provider adapter and keep a local history.
+
+Every adapter returns records in one normalized shape:
+    {"provider": "aws", "service": "Amazon EC2", "date": "2026-09-13", "cost": 4.32}
+
+Design notes:
+  * Adapters are imported lazily, inside the per-provider try/except, so a
+    missing SDK, missing credentials or a failing API for ONE cloud never
+    stops the others.
+  * The current day is dropped before saving: billing data for "today" is
+    partial and would look like a fake cost drop on the next run.
+  * Re-fetched days REPLACE stored ones (providers revise recent numbers).
+
+    python3 -m core.engine
 """
-engine.py
 
-Fetches cost data from every connected cloud provider adapter and stores
-it locally as JSON, in one normalized format regardless of provider.
+from __future__ import annotations
 
-If a provider's adapter fails (e.g. a billing export still initializing),
-the run continues with whichever providers succeeded.
-"""
-
+import importlib
 import json
-import sys
 import os
-from datetime import datetime
+import sys
+from datetime import date, datetime
+from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from adapters.aws_adapter import get_daily_costs as get_aws_costs
-from adapters.gcp_adapter import get_daily_costs as get_gcp_costs
-from adapters.azure_adapter import get_daily_costs as get_azure_costs
+ROOT = Path(__file__).resolve().parent.parent
+DATA_FILE = ROOT / "data" / "cost_history.json"
+LOG_FILE = ROOT / "data" / "run.log"
 
-DATA_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data",
-    "cost_history.json",
-)
+# provider name -> adapter module (each exposes get_daily_costs(days))
+ADAPTERS = {
+    "aws": "adapters.aws_adapter",
+    "gcp": "adapters.gcp_adapter",
+    "azure": "adapters.azure_adapter",
+}
 
 
-def load_history() -> list[dict]:
-    if not os.path.exists(DATA_FILE):
+def log(message: str) -> None:
+    line = f"[{datetime.now().isoformat(timespec='seconds')}] {message}"
+    print(line)
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with LOG_FILE.open("a") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass  # logging must never break a run
+
+
+def load_history(path: Path | str | None = None) -> list[dict]:
+    path = Path(path or DATA_FILE)  # resolved at call time so tests can redirect it
+    if not path.exists():
         return []
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+    data = json.loads(path.read_text())
+    return data["records"] if isinstance(data, dict) else data
 
 
-def save_history(records: list[dict]) -> None:
-    with open(DATA_FILE, "w") as f:
-        json.dump(records, f, indent=2)
+def save_history(records: list[dict], path: Path | str | None = None) -> None:
+    path = Path(path or DATA_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(records, key=lambda r: (r["provider"], r["service"], r["date"]))
+    path.write_text(json.dumps(ordered, indent=2))
 
 
-def dedupe(records: list[dict]) -> list[dict]:
-    seen = {}
-    for r in records:
-        key = (r["provider"], r["service"], r["date"])
-        seen[key] = r
-    return list(seen.values())
+def merge_records(old: list[dict], new: list[dict]) -> list[dict]:
+    """Union by (provider, service, date); `new` wins on conflicts."""
+    merged: dict[tuple, dict] = {}
+    for r in [*old, *new]:
+        merged[(r["provider"], r["service"], r["date"])] = r
+    return list(merged.values())
 
 
-def run() -> None:
-    print(f"[{datetime.now().isoformat()}] Fetching cost data...")
-    new_records = []
+def drop_today(records: list[dict], today: str | None = None) -> list[dict]:
+    """Remove today's (partial) rows."""
+    today = today or date.today().isoformat()
+    return [r for r in records if r["date"] != today]
 
-    try:
-        aws_records = get_aws_costs(days=14)
-        print(f"  AWS: fetched {len(aws_records)} records.")
-        new_records.extend(aws_records)
-    except Exception as e:
-        print(f"  AWS: fetch failed ({e})")
 
-    try:
-        gcp_records = get_gcp_costs(days=14)
-        print(f"  GCP: fetched {len(gcp_records)} records.")
-        new_records.extend(gcp_records)
-    except Exception as e:
-        print(f"  GCP: fetch failed ({e})")
+def fetch_all(days: int = 14) -> tuple[list[dict], dict[str, str]]:
+    """Fetch from every adapter. Returns (records, {provider: error_message})."""
+    records: list[dict] = []
+    errors: dict[str, str] = {}
+    for provider, module_path in ADAPTERS.items():
+        try:
+            adapter = importlib.import_module(module_path)
+            fetched = adapter.get_daily_costs(days=days)
+            log(f"  {provider}: fetched {len(fetched)} records")
+            records.extend(fetched)
+        except Exception as exc:  # isolate each provider on purpose
+            errors[provider] = f"{type(exc).__name__}: {exc}"
+            log(f"  {provider}: FAILED ({errors[provider]})")
+    return records, errors
 
-    try:
-        azure_records = get_azure_costs(days=14)
-        print(f"  Azure: fetched {len(azure_records)} records.")
-        new_records.extend(azure_records)
-    except Exception as e:
-        print(f"  Azure: fetch failed ({e})")
 
-    existing = load_history()
-    combined = dedupe(existing + new_records)
-    save_history(combined)
-
-    print(f"Stored {len(combined)} total records ({len(new_records)} fetched this run).")
-    print(f"Data written to: {DATA_FILE}")
+def run(days: int = 14) -> dict[str, str]:
+    """Fetch, merge into history, save. Returns per-provider errors."""
+    log("Fetching cost data...")
+    fetched, errors = fetch_all(days)
+    history = merge_records(load_history(), drop_today(fetched))
+    save_history(history)
+    log(f"Stored {len(history)} total records ({len(fetched)} fetched this run).")
+    return errors
 
 
 if __name__ == "__main__":
-    run()
+    failed = run()
+    # exit non-zero only if EVERY provider failed, so cron/CI notices real outages
+    sys.exit(1 if len(failed) == len(ADAPTERS) else 0)

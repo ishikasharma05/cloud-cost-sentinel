@@ -39,3 +39,15 @@ def test_one_provider_failing_does_not_stop_the_other(monkeypatch):
     monkeypatch.setattr(engine, "log", lambda m: None)
     records, errors = engine.fetch_all(days=7)
     assert len(records) == 1 and "gcp" in errors and "aws" not in errors
+
+def test_run_merges_saves_and_drops_today(tmp_path, monkeypatch):
+    f = tmp_path / "h.json"
+    monkeypatch.setattr(engine, "DATA_FILE", f)
+    monkeypatch.setattr(engine, "log", lambda m: None)
+    today = engine.date.today().isoformat()
+    monkeypatch.setattr(
+        engine, "fetch_all",
+        lambda days=14: ([rec("aws", "EC2", "2026-10-17", 4.0), rec("aws", "EC2", today, 0.5)], {}),
+    )
+    assert engine.run() == {}
+    assert [r["date"] for r in engine.load_history(f)] == ["2026-10-17"]
