@@ -4,6 +4,8 @@
 
 ![Slack alert](docs/slack-alert.png)
 
+![Telegram alert](docs/telegram-alert.png)
+
 A cloud-agnostic agent that watches cloud spend across providers, detects
 anomalies against a rolling baseline, and alerts when something looks off —
 built to be cheap to run: the only paid call is one AWS Cost Explorer
@@ -17,7 +19,7 @@ The core pipeline is built and tested. The scheduled daily run is being verified
 - [x] Week 1 — AWS cost data ingestion (Cost Explorer) + local storage
 - [x] Week 1.5 — GCP cost data ingestion (BigQuery Billing Export; the adapter runs against a live export; spend is currently $0, so no cost rows have flowed through yet)
 - [x] Week 2 — Baseline + anomaly detection (rolling baseline, three-gate rule)
-- [x] Week 3 — Alerting (Slack-compatible webhook, console fallback, no duplicate alerts)
+- [x] Week 3 — Alerting (Slack webhook and Telegram bot, both verified live; console fallback; no duplicate alerts)
 - [x] Week 4 — CI (pytest on every push) and docs
 - [ ] Daily scheduled run (GitHub Actions cron) — workflow in place, first live run pending
 - [x] Azure adapter written (Cost Management API; currency-aware) — not yet verified against live Azure billing data
@@ -29,7 +31,7 @@ Tests run on every push via GitHub Actions (`pytest`).
 ```
 adapters (AWS / GCP / Azure)  ->  engine  ->  data/cost_history.json
                                                      |
-                              detector (rolling baseline) -> alerter (Slack)
+                              detector (rolling baseline) -> alerter (Slack, Telegram)
 ```
 
 A service is flagged for a day only if it clears **all three** gates, which

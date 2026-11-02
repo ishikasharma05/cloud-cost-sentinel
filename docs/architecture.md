@@ -19,6 +19,11 @@ to catch that early:
   tools, though, and a black box. This project does not try to beat them;
   it gives one place that reasons across providers, with rules you can
   read, tune and explain.
+- To be fair, the clouds also ship their own anomaly features (AWS Cost
+  Anomaly Detection is free and ML-based). They are separate per-cloud
+  tools, though, and a black box. This project does not try to beat them;
+  it gives one place that reasons across providers, with rules you can
+  read, tune and explain.
 
 ## The approach
 
@@ -154,6 +159,12 @@ daily; history and alert state are persisted with the Actions cache because
 the data files are gitignored.
 
 ## Known limitations
+
+- Cost: the AWS Cost Explorer API charges about $0.01 per request. The
+  daily run makes one request, roughly $0.30 a month; manual runs add to it.
+- The AWS adapter does not follow `NextPageToken`, so an account with a very
+  large number of services could have results truncated. Fine for small
+  accounts; adding pagination would also add (small) per-page cost.
 
 - Cost: the AWS Cost Explorer API charges about $0.01 per request. The
   daily run makes one request, roughly $0.30 a month; manual runs add to it.
