@@ -103,7 +103,9 @@ python3 -m pytest                 # run the tests
 ```
 
 **Alerts:** set `SLACK_WEBHOOK_URL` (Slack incoming webhook or any compatible
-endpoint). Without it, alerts print to the console.
+endpoint) and/or `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (a Telegram bot, for
+phone notifications). Both can be on at once, and one failing does not block
+the other. With neither set, alerts print to the console.
 
 **Azure (optional):** `az login` and set `AZURE_SUBSCRIPTION_ID`. Azure bills in
 your account currency (e.g. INR). When the API returns a currency column it is
@@ -117,7 +119,8 @@ kept per record and shown in alerts; otherwise USD is assumed.
 | Secret | Purpose |
 | --- | --- |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | read-only IAM user (`ce:GetCostAndUsage` only) |
-| `SLACK_WEBHOOK_URL` | where alerts go |
+| `SLACK_WEBHOOK_URL` | Slack alerts (optional) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Telegram alerts (optional) |
 
 Providers without credentials simply fail that step and are logged; the run
 continues with the rest. History and alert state persist between runs via the

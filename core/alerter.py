@@ -1,8 +1,10 @@
-"""Alerting: Slack-compatible webhook, with console fallback and dedup.
+"""Alerting: Slack webhook and/or Telegram bot, with console fallback and dedup.
 
-Set SLACK_WEBHOOK_URL in your environment (see .env.example). With no webhook
-configured, alerts are printed instead, so the pipeline never fails silently.
-Uses only the standard library (no new dependencies).
+Configure either or both via environment variables (see .env.example):
+    SLACK_WEBHOOK_URL
+    TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
+With nothing configured, alerts are printed instead, so the pipeline never
+fails silently. Uses only the standard library (no new dependencies).
 """
 
 from __future__ import annotations
@@ -50,6 +52,18 @@ def _post(webhook_url: str, text: str) -> None:
         resp.read()
 
 
+def _post_telegram(token: str, chat_id: str, text: str) -> None:
+    # Telegram gets plain text: Slack's :emoji: codes and *bold* don't render there.
+    plain = text.replace(":rotating_light:", "🚨").replace("*", "")
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=json.dumps({"chat_id": chat_id, "text": plain}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        resp.read()
+
+
 def send_alerts(
     anomalies: list[Anomaly],
     webhook_url: str | None = None,
@@ -57,6 +71,8 @@ def send_alerts(
 ) -> list[Anomaly]:
     """Send each anomaly once (dedup by provider+service+date). Returns those sent."""
     webhook_url = webhook_url or os.environ.get("SLACK_WEBHOOK_URL")
+    tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    tg_chat = os.environ.get("TELEGRAM_CHAT_ID")
     state_path = state_path or DEFAULT_STATE
     already = _load_state(state_path)
     sent: list[Anomaly] = []
@@ -65,13 +81,23 @@ def send_alerts(
         if _key(a) in already:
             continue
         msg = format_message(a)
-        try:
-            if webhook_url:
-                _post(webhook_url, msg)
-            else:
-                print(msg)
-        except Exception as exc:  # a failed alert must not crash the run or be marked as sent
-            print(f"[alerter] failed to send alert for {_key(a)}: {exc}")
+        senders = []
+        if webhook_url:
+            senders.append(("slack", lambda m: _post(webhook_url, m)))
+        if tg_token and tg_chat:
+            senders.append(("telegram", lambda m: _post_telegram(tg_token, tg_chat, m)))
+        if not senders:
+            print(msg)
+            delivered = True
+        else:
+            delivered = False
+            for name, send in senders:
+                try:
+                    send(msg)
+                    delivered = True
+                except Exception as exc:  # one channel failing must not block the other
+                    print(f"[alerter] {name} failed for {_key(a)}: {exc}")
+        if not delivered:  # not marked as sent, so it is retried next run
             continue
         already.add(_key(a))
         sent.append(a)

@@ -31,3 +31,32 @@ def test_new_date_is_a_new_alert(tmp_path):
 def test_inr_symbol_used_for_non_usd():
     a = Anomaly("azure", "Storage", "2026-09-20", 1600.0, 400.0, 5.0, 9.0, 300.0, "INR")
     assert "₹1600.00" in format_message(a)
+
+
+def test_telegram_sends_plain_text_and_dedups(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr("core.alerter._post_telegram", lambda tok, chat, text: calls.append((tok, chat, text)))
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    state = tmp_path / "s.json"
+    assert len(send_alerts([an()], state_path=state)) == 1
+    assert send_alerts([an()], state_path=state) == []
+    assert calls[0][:2] == ("tok", "123") and len(calls) == 1
+
+
+def test_one_channel_failing_does_not_block_the_other(tmp_path, monkeypatch):
+    got = []
+    def boom(*a): raise OSError("down")
+    monkeypatch.setattr("core.alerter._post", boom)
+    monkeypatch.setattr("core.alerter._post_telegram", lambda t, c, m: got.append(m))
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "1")
+    sent = send_alerts([an()], webhook_url="https://example.invalid/x", state_path=tmp_path / "s.json")
+    assert len(sent) == 1 and len(got) == 1
+
+
+def test_all_channels_failing_is_retried_next_run(tmp_path, monkeypatch):
+    def boom(*a): raise OSError("down")
+    monkeypatch.setattr("core.alerter._post", boom)
+    state = tmp_path / "s.json"
+    assert send_alerts([an()], webhook_url="https://example.invalid/x", state_path=state) == []
