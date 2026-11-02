@@ -1,19 +1,26 @@
 # Cloud Cost Sentinel
 
+![CI](https://github.com/ishikasharma05/cloud-cost-sentinel/actions/workflows/ci.yml/badge.svg)
+
+![Slack alert](docs/slack-alert.png)
+
 A cloud-agnostic agent that watches cloud spend across providers, detects
 anomalies against a rolling baseline, and alerts when something looks off —
-built entirely on free-tier usage.
+built to be cheap to run: the only paid call is one AWS Cost Explorer
+request per day (about $0.01, so roughly $0.30 a month); everything else
+fits within free allowances at this scale.
 
 ## Status
 
-All planned weeks are complete.
+The core pipeline is built and tested. The scheduled daily run is being verified.
 
 - [x] Week 1 — AWS cost data ingestion (Cost Explorer) + local storage
-- [x] Week 1.5 — GCP cost data ingestion (BigQuery Billing Export)
+- [x] Week 1.5 — GCP cost data ingestion (BigQuery Billing Export; the adapter runs against a live export; spend is currently $0, so no cost rows have flowed through yet)
 - [x] Week 2 — Baseline + anomaly detection (rolling baseline, three-gate rule)
 - [x] Week 3 — Alerting (Slack-compatible webhook, console fallback, no duplicate alerts)
-- [x] Week 4 — Scheduling (GitHub Actions daily cron), CI, docs
-- [x] Azure adapter (Cost Management API; currency-aware)
+- [x] Week 4 — CI (pytest on every push) and docs
+- [ ] Daily scheduled run (GitHub Actions cron) — workflow in place, first live run pending
+- [x] Azure adapter written (Cost Management API; currency-aware) — not yet verified against live Azure billing data
 
 Tests run on every push via GitHub Actions (`pytest`).
 
@@ -32,6 +39,8 @@ keeps tiny-dollar noise from paging anyone:
 2. **absolute** increase >= $0.50
 3. **relative** increase >= 30%
 
+A service also needs at least 5 days of history before it can be flagged.
+
 Each provider is judged on its own newest day, so a cloud whose billing data
 lags a day behind is not skipped. Today's partial data is dropped before storing.
 
@@ -39,11 +48,14 @@ lags a day behind is not skipped. Today's partial data is dropped before storing
 
 Most portfolio "monitoring" projects watch servers or containers. This one
 watches something every team actually cares about and rarely automates
-well at small scale: cost. Native tools like AWS CloudWatch billing alarms
-or GCP Budgets only watch one cloud each, with a static threshold someone
-has to set and re-tune by hand. This agent normalizes cost data across
-providers into one pipeline and compares against a rolling baseline that
-adapts on its own — and it's deliberately cheap to build and run, since it
+well at small scale: cost. Budgets and billing alarms (AWS Budgets, GCP
+Budgets) use static thresholds someone has to set and re-tune by hand. Each
+cloud also has its own anomaly feature (for example AWS Cost Anomaly
+Detection), but they are separate, single-cloud tools. This project is a
+small, transparent alternative: it normalizes cost data from several
+providers into one pipeline and flags deviations from a rolling baseline
+with simple rules you can read and explain. It is not a replacement for
+the managed tools, and it is deliberately cheap to build and run, since it
 mostly reads billing APIs rather than running heavy compute.
 
 ## Architecture
@@ -58,10 +70,12 @@ and normalizes it into one common shape:
 ```
 
 That means adding a new provider later is "write one more adapter file,"
-not "rebuild the engine." The engine also fetches from each provider
+not "rebuild the engine." (One adapter file, plus one line in the
+`ADAPTERS` map in `core/engine.py`.) The engine also fetches from each provider
 independently — if one adapter fails (e.g. a billing export table still
 initializing), the run continues with whichever providers succeeded
 instead of failing entirely.
+
 ## Setup
 
 **AWS:**
@@ -92,11 +106,12 @@ python3 -m pytest                 # run the tests
 endpoint). Without it, alerts print to the console.
 
 **Azure (optional):** `az login` and set `AZURE_SUBSCRIPTION_ID`. Azure bills in
-your account currency (e.g. INR); it is kept per record and shown in alerts.
+your account currency (e.g. INR). When the API returns a currency column it is
+kept per record and shown in alerts; otherwise USD is assumed.
 
 ## Running it daily
 
-`.github/workflows/daily-check.yml` runs the pipeline every day at 10:00 IST
+`.github/workflows/daily-check.yml` is configured to run the pipeline every day at 10:00 IST
 (and on demand from the Actions tab). Add these repository secrets:
 
 | Secret | Purpose |
